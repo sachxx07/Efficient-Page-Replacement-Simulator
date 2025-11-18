@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Page Replacement Simulator — Glossy</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <h1>Page Replacement Simulator</h1>
+      <p class="subtitle">Compare FIFO, LRU, and Optimal — visual, animated, and responsive.</p>
+    </header>
+
+    <section class="controls card">
+      <div class="row">
+        <label>Algorithm
+          <select id="algo">
+            <option value="FIFO">FIFO</option>
+            <option value="LRU">LRU</option>
+            <option value="Optimal">Optimal</option>
+          </select>
+        </label>
+
+        <label>Frames
+          <input id="frames" type="number" min="1" max="10" value="3" />
+        </label>
+
+        <label>Reference string (comma separated)
+          <input id="refString" type="text" placeholder="7,0,1,2,0,3,0,4" value="7,0,1,2,0,3,0,4" />
+        </label>
+      </div>
+
+      <div class="row actions">
+        <button id="runBtn" class="btn primary">Run Simulation</button>
+        <button id="stepBtn" class="btn" disabled>Step</button>
+        <button id="resetBtn" class="btn" disabled>Reset</button>
+        <div class="small muted">Tip: use only numbers separated by commas</div>
+      </div>
+    </section>
+
+    <section class="visuals">
+      <div class="left card">
+        <h2>Animation</h2>
+        <div id="animation" class="animation">
+          <!-- frames visualization injected here -->
+        </div>
+      </div>
+
+      <aside class="right card stats">
+        <h2>Metrics</h2>
+        <div class="metric">
+          <div class="label">Hits</div>
+          <div id="hits" class="value">0</div>
+        </div>
+        <div class="metric">
+          <div class="label">Misses</div>
+          <div id="misses" class="value">0</div>
+        </div>
+        <div class="metric">
+          <div class="label">Hit Ratio</div>
+          <div id="hitRatio" class="value">0%</div>
+        </div>
+
+        <h3>Reference Sequence</h3>
+        <div id="sequence" class="sequence"></div>
+
+        <div class="playback">
+          <label>Speed
+            <input id="speed" type="range" min="100" max="1500" step="50" value="600" />
+          </label>
+        </div>
+      </aside>
+    </section>
+
+    <section class="log card">
+      <h2>Step Log</h2>
+      <div id="logArea" class="logArea"></div>
+    </section>
+
+    <footer class="footer">
+      <small>Built with HTML, CSS, JS, Node.js and C++ — for OS course project</small>
+    </footer>
+  </main>
+
+  <script src="script.js"></script>
+</body>
+</html>
