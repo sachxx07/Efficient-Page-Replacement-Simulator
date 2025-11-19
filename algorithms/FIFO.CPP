@@ -1,7 +1,3 @@
-// FIFO.cpp
-// Usage: ./FIFO <frames> <comma-separated-refs>
-// Outputs JSON to stdout describing steps.
-
 #include <bits/stdc++.h>
 using namespace std;
 
@@ -36,12 +32,11 @@ int main(int argc, char** argv){
             steps.push_back({r, frame, "hit", i});
         } else {
             misses++;
-            // find empty slot
             bool placed=false;
             for(int j=0;j<frames;++j){
                 if(frame[j]==-1){
                     frame[j]=r;
-                    q.push(j); // push index
+                    q.push(j); 
                     placed=true;
                     break;
                 }
@@ -55,7 +50,6 @@ int main(int argc, char** argv){
         }
     }
 
-    // output JSON
     cout << "{";
     cout << "\"frames\":" << frames << ",";
     cout << "\"sequence\":[";
