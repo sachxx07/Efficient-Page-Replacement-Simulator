@@ -1,6 +1,7 @@
 // script.js - frontend logic (vanilla JS)
 // Sends request to backend -> receives JSON steps -> animates
-const API_BASE = "http://localhost:3000";
+const API_BASE = "https://efficient-page-replacement-simulator.onrender.com";
+
 const runBtn = document.getElementById('runBtn');
 const stepBtn = document.getElementById('stepBtn');
 const resetBtn = document.getElementById('resetBtn');
@@ -142,8 +143,6 @@ runBtn.addEventListener('click', async () => {
   showMessage('Sending request to server...');
   try{
     const res = await fetch(`${API_BASE}/run`, {
-
-
       method:'POST',
       headers:{ 'Content-Type':'application/json' },
       body: JSON.stringify({ algorithm: algo, frames: frames, refs: refs })
