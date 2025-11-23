@@ -1,10 +1,13 @@
 {
   "name": "page-replacement-simulator-backend",
   "version": "1.0.0",
-  "description": "Backend for Page Replacement Simulator - compiles and runs C++ algorithms",
+  "description": "Backend for Page Replacement Simulator - runs page replacement algorithms",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
+  },
+  "engines": {
+    "node": "18.x"
   },
   "author": "",
   "license": "MIT",
