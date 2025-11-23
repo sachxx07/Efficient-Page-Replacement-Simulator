@@ -1,98 +1,197 @@
-// server.js - minimal backend that compiles & runs C++ algorithms safely
-const express = require('express');
-const bodyParser = require('body-parser');
-const { exec } = require('child_process');
-const { spawn } = require('child_process');
-const path = require('path');
-const fs = require('fs');
+const express = require("express");
+const cors = require("cors");
 
 const app = express();
-app.use(bodyParser.json());
-app.use(express.static(path.join(__dirname, '..'))); // serve frontend files
-app.use(require('cors')());
+app.use(cors());
+app.use(express.json());
 
-const algorithmsDir = path.join(__dirname, '..', 'algorithms');
-const allowedAlgorithms = {
-  'FIFO': 'FIFO.cpp',
-  'LRU': 'LRU.cpp',
-  'Optimal': 'Optimal.cpp'
-};
+// ----- Simulation helpers -----
 
-function compileIfNeeded(algKey){
-  return new Promise((resolve, reject) => {
-    const cpp = allowedAlgorithms[algKey];
-    if(!cpp) return reject(new Error('Invalid algorithm'));
-    const exeName = algKey; // e.g., FIFO
-    const exePath = path.join(algorithmsDir, exeName);
-    // if exe exists and is newer than source, skip
-    const srcPath = path.join(algorithmsDir, cpp);
-    fs.stat(exePath, (ee, est) => {
-      fs.stat(srcPath, (er, sst) => {
-        if(!er && !ee && est.mtimeMs >= sst.mtimeMs){
-          return resolve(exePath);
-        }
-        // compile
-        const cmd = `g++ -std=c++17 -O2 "${srcPath}" -o "${exePath}"`;
-        exec(cmd, { timeout: 20_000 }, (err, stdout, stderr) => {
-          if(err){
-            return reject(new Error('Compilation failed: ' + stderr));
-          }
-          return resolve(exePath);
-        });
+function simulateFIFO(refs, framesCount) {
+  const frames = Array(framesCount).fill(-1);
+  const steps = [];
+  let hits = 0, misses = 0;
+  let nextReplaceIndex = 0;
+
+  refs.forEach((ref, idx) => {
+    const hitIndex = frames.indexOf(ref);
+    if (hitIndex !== -1) {
+      // hit
+      hits++;
+      steps.push({
+        ref,
+        state: [...frames],
+        result: "hit",
+        idx
       });
-    });
+    } else {
+      // miss
+      misses++;
+      frames[nextReplaceIndex] = ref;
+      nextReplaceIndex = (nextReplaceIndex + 1) % framesCount;
+      steps.push({
+        ref,
+        state: [...frames],
+        result: "miss",
+        idx
+      });
+    }
   });
+
+  return { hits, misses, steps };
 }
 
-app.post('/run', async (req, res) => {
-  try{
+function simulateLRU(refs, framesCount) {
+  const frames = Array(framesCount).fill(-1);
+  const steps = [];
+  let hits = 0, misses = 0;
+  const lastUsed = new Map();
+
+  refs.forEach((ref, idx) => {
+    const hitIndex = frames.indexOf(ref);
+
+    if (hitIndex !== -1) {
+      // hit
+      hits++;
+      lastUsed.set(ref, idx);
+      steps.push({
+        ref,
+        state: [...frames],
+        result: "hit",
+        idx
+      });
+    } else {
+      // miss
+      misses++;
+      // if there is empty slot, use it first
+      let emptyIndex = frames.indexOf(-1);
+      if (emptyIndex !== -1) {
+        frames[emptyIndex] = ref;
+      } else {
+        // find least recently used
+        let lruPage = frames[0];
+        let lruIndex = lastUsed.get(lruPage) ?? -1;
+
+        frames.forEach(p => {
+          const lu = lastUsed.get(p) ?? -1;
+          if (lruIndex === -1 || lu < lruIndex) {
+            lruPage = p;
+            lruIndex = lu;
+          }
+        });
+
+        const replacePos = frames.indexOf(lruPage);
+        frames[replacePos] = ref;
+      }
+
+      lastUsed.set(ref, idx);
+      steps.push({
+        ref,
+        state: [...frames],
+        result: "miss",
+        idx
+      });
+    }
+  });
+
+  return { hits, misses, steps };
+}
+
+function simulateOptimal(refs, framesCount) {
+  const frames = Array(framesCount).fill(-1);
+  const steps = [];
+  let hits = 0, misses = 0;
+
+  refs.forEach((ref, idx) => {
+    const hitIndex = frames.indexOf(ref);
+
+    if (hitIndex !== -1) {
+      // hit
+      hits++;
+      steps.push({
+        ref,
+        state: [...frames],
+        result: "hit",
+        idx
+      });
+    } else {
+      // miss
+      misses++;
+      const emptyIndex = frames.indexOf(-1);
+      if (emptyIndex !== -1) {
+        frames[emptyIndex] = ref;
+      } else {
+        // choose the page whose next use is farthest in the future
+        let replacePos = 0;
+        let farthest = -1;
+
+        frames.forEach((page, i) => {
+          const nextUse = refs.indexOf(page, idx + 1);
+          if (nextUse === -1) {
+            // never used again -> best to replace
+            replacePos = i;
+            farthest = Number.POSITIVE_INFINITY;
+          } else if (nextUse > farthest) {
+            farthest = nextUse;
+            replacePos = i;
+          }
+        });
+
+        frames[replacePos] = ref;
+      }
+
+      steps.push({
+        ref,
+        state: [...frames],
+        result: "miss",
+        idx
+      });
+    }
+  });
+
+  return { hits, misses, steps };
+}
+
+// ----- API route -----
+
+app.post("/run", (req, res) => {
+  try {
     const { algorithm, frames, refs } = req.body;
-    if(!algorithm || !allowedAlgorithms[algorithm]) return res.status(400).send('Algorithm not allowed');
-    if(!Number.isInteger(frames) || frames <= 0 || frames > 50) return res.status(400).send('Invalid frames');
-    if(!Array.isArray(refs) || refs.length === 0 || refs.length > 200) return res.status(400).send('Invalid refs');
 
-    // sanitize refs: only integers
-    const safeRefs = refs.map(n => parseInt(n,10)).filter(n => !Number.isNaN(n));
-    if(safeRefs.length === 0) return res.status(400).send('Invalid reference string');
+    if (!algorithm || !Array.isArray(refs) || !frames) {
+      return res.status(400).send("Invalid input");
+    }
 
-    // compile if needed
-    const exePath = await compileIfNeeded(algorithm);
+    const framesCount = Number(frames);
+    const sequence = refs.map(Number);
 
-    // prepare args: frames and comma-separated refs
-    const args = [String(frames), safeRefs.join(',')];
+    let result;
+    const algoLower = String(algorithm).toLowerCase();
 
-    // spawn the executable
-    const proc = spawn(exePath, args, { cwd: algorithmsDir, timeout: 20_000 });
+    if (algoLower === "fifo") {
+      result = simulateFIFO(sequence, framesCount);
+    } else if (algoLower === "lru") {
+      result = simulateLRU(sequence, framesCount);
+    } else if (algoLower === "optimal" || algoLower === "opt") {
+      result = simulateOptimal(sequence, framesCount);
+    } else {
+      return res.status(400).send("Unknown algorithm: " + algorithm);
+    }
 
-    let out = '';
-    let err = '';
-    proc.stdout.on('data', d => out += d.toString());
-    proc.stderr.on('data', d => err += d.toString());
-
-    proc.on('error', (e) => {
-      return res.status(500).send('Execution error: ' + e.message);
+    res.json({
+      frames: framesCount,
+      sequence,
+      hits: result.hits,
+      misses: result.misses,
+      steps: result.steps
     });
-
-    proc.on('close', code => {
-      if(code !== 0){
-        return res.status(500).send('Algorithm exited with code ' + code + ' stderr: ' + err);
-      }
-      // Expect valid JSON from C++ stdout
-      try{
-        const parsed = JSON.parse(out);
-        return res.json(parsed);
-      }catch(e){
-        return res.status(500).send('Invalid algorithm output: ' + e.message + '\n' + out + '\n' + err);
-      }
-    });
-
-  }catch(e){
+  } catch (e) {
     console.error(e);
-    res.status(500).send(e.message);
+    res.status(500).send("Server error: " + e.message);
   }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, ()=> {
-  console.log(`Server started on port ${PORT}`);
+app.listen(PORT, () => {
+  console.log("Server started on port " + PORT);
 });
