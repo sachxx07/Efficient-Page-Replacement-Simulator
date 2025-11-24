@@ -144,10 +144,11 @@ runBtn.addEventListener('click', async () => {
   showMessage('Sending request to server...');
   try{
     const res = await fetch(`${API_BASE}/run`, {
-      method:'POST',
-      headers:{ 'Content-Type':'application/json' },
-      body: JSON.stringify({ algorithm: algo, frames: frames, refs: refs })
-    });
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ algorithm: algo, frames: frames, refs: refs })
+});
+
     if(!res.ok){
       const txt = await res.text();
       throw new Error(txt || 'Server error');
