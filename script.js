@@ -1,6 +1,7 @@
 // script.js - frontend logic (vanilla JS)
 // Sends request to backend -> receives JSON steps -> animates
-const API_BASE = "https://efficient-page-replacement-simulator.onrender.com";
+const API_BASE = "http://localhost:3000";
+
 
 const runBtn = document.getElementById('runBtn');
 const stepBtn = document.getElementById('stepBtn');
